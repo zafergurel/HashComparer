@@ -3,7 +3,12 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 15
 VisualStudioVersion = 15.0.27004.2009
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "HashComparer", "HashComparer.csproj", "{7EAA3D28-D5B7-49DB-83FD-C2941709F606}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "HashComparer", "src\HashComparer.csproj", "{7EAA3D28-D5B7-49DB-83FD-C2941709F606}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "docs", "docs", "{3B0CB07A-6FA3-4CB4-AC21-F99093ED8009}"
+	ProjectSection(SolutionItems) = preProject
+		ReadMe.md = ReadMe.md
+	EndProjectSection
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

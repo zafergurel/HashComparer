@@ -10,7 +10,7 @@ Checksums are calculated by MD5 algorithm.
 
 The idea is to find modified files by comparing the checksums of files to the ones in the created database file. 
 
-The added, deleted, and modified files are logged in a log file. Also email can be sent. NLog is used as the logging component.
+The added, deleted, and modified files are logged in a log file and/or sent as e-mail.
 
 ## Configuration
 

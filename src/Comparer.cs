@@ -57,15 +57,8 @@ namespace HashComparer
 
             try
             {
-                var missingDirs = new List<string>();
-                foreach (var dir in _config.TargetDirectories)
-                {
-                    if (!Directory.Exists(dir))
-                    {
-                        missingDirs.Add(dir);
-                        return false;
-                    }
-                }
+                var missingDirs = _config.TargetDirectories.Where(dir => !Directory.Exists(dir)).ToList();
+                
                 if (missingDirs.Count > 0)
                 {
                     _logger.Error($"Target directories ({String.Join("; ", missingDirs)}) could not be found.");

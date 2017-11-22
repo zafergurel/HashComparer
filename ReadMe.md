@@ -29,3 +29,8 @@ The configuration keys and their values are described below:
 For instance to scan the "d" directory under "a" (a->b->c->d), the search level should be 4.
 
 **SearchPattern:** This is the file filter that specifies which files will be included. The default is * which means all files. To include for example just pdf and xlsx files, *.pdf;*.xlsx should be the value.
+
+## Notes for Developers
+
+It's a .Net application. The development IDE is Visual Studio Community 2017. The target framework is 4.6.1.
+

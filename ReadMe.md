@@ -34,3 +34,10 @@ For instance to scan the "d" directory under "a" (a->b->c->d), the search level 
 
 It's a .Net application. The development IDE is Visual Studio Community 2017. The target framework is 4.6.1.
 
+## Installation
+
+Download the zip file under dist folder where you can find the latest version (currently it's 1 :)). 
+
+Extract the files, change the configuration (by editing HashComparer.exe.config and NLog.config), and run HashComparer.
+
+You can create a scheduled task in Windows so that you can check integrities of files periodically every day on a specific time.

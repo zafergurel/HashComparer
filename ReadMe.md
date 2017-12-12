@@ -1,4 +1,4 @@
-﻿# HashComparer 1.0
+﻿# HashComparer 1.1
 
 HashComparer is a small application that checks the integrity of files by comparing their pre-calculated checksums in a file.
 
@@ -38,7 +38,7 @@ It's a .Net application. The development IDE is Visual Studio Community 2017. Th
 
 ## Installation
 
-Download the zip file under dist folder where you can find the latest version (currently it's 1 :)). 
+Download the zip file under dist folder where you can find the latest version. 
 
 Extract the files, change the configuration (by editing HashComparer.exe.config and NLog.config), and run HashComparer.
 

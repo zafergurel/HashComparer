@@ -29,6 +29,13 @@ namespace HashComparer
                 config.TargetDirectories = new string[] { AppDomain.CurrentDomain.BaseDirectory };
             }
 
+            config.BackupFolder = ConfigurationManager.AppSettings["BackupFolder"];
+            if (string.IsNullOrEmpty(config.BackupFolder))
+            {
+                config.BackupFolder = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "hashcomparer_backup");
+            }
+
+
             config.SearchPattern = ConfigurationManager.AppSettings["SearchPattern"] ?? "*";
 
             var missingDirs = config.TargetDirectories.Where(t => !Directory.Exists(t));

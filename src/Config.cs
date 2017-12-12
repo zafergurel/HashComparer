@@ -9,6 +9,7 @@ namespace HashComparer
         
         public string[] TargetDirectories { get; set; }
         public string IndexFileLocation { get; set; }
+        public string BackupFolder { get; set; }
         public string SearchPattern { get; set; }
         public int SearchLevel { get; set; }
     }

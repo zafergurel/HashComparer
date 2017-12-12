@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using System.Security.Cryptography;
 using System.Diagnostics;
 using NLog;
+using System.IO.Compression;
 
 namespace HashComparer
 {
@@ -58,7 +59,7 @@ namespace HashComparer
             try
             {
                 var missingDirs = _config.TargetDirectories.Where(dir => !Directory.Exists(dir)).ToList();
-                
+
                 if (missingDirs.Count > 0)
                 {
                     _logger.Error($"Target directories ({String.Join("; ", missingDirs)}) could not be found.");
@@ -82,6 +83,8 @@ namespace HashComparer
 
                 loadIndexIntoMemory();
 
+                backupIndexFile();
+
                 foreach (var targetDirectory in existingTargetDirectories)
                 {
                     compareOrCreateChecksums(targetDirectory, 1);
@@ -101,22 +104,68 @@ namespace HashComparer
             }
         }
 
+        private void backupIndexFile()
+        {
+            if (File.Exists(_config.IndexFileLocation))
+            {
+                string bakFileName = Path.GetFileName(_config.IndexFileLocation) + "." + DateTime.Now.ToString("yyyyMMddHHmmss") + ".bak";
+                string folderToZip = Path.Combine(_config.BackupFolder, DateTime.Now.ToString("yyyyMMddHHmmss") + "_" + Guid.NewGuid().ToString());
+                string bakFilePath = Path.Combine(folderToZip, bakFileName);
+
+                if (!Directory.Exists(_config.BackupFolder))
+                {
+                    _logger.Info("Creating root backup folder for database files: " + _config.BackupFolder);
+                    Directory.CreateDirectory(_config.BackupFolder);
+                }
+
+                _logger.Trace("Creating backup folder to be zipped: " + folderToZip);
+                Directory.CreateDirectory(folderToZip);
+
+                _logger.Trace("Copying database file to " + bakFilePath);
+                File.Copy(_config.IndexFileLocation, bakFilePath);
+
+                _logger.Trace("Zipping folder " + folderToZip);
+                ZipFile.CreateFromDirectory(folderToZip, folderToZip + ".zip");
+
+                _logger.Trace("Deleting folder " + folderToZip);
+                Directory.Delete(folderToZip, true);
+
+                if (File.Exists(folderToZip + ".zip"))
+                {
+                    _logger.Trace("Deleting index file after successful backup: " + _config.IndexFileLocation);
+                    File.Delete(_config.IndexFileLocation);
+                }
+                else
+                {
+                    throw (new Exception("Database file could not be backed-up. File: " + folderToZip + ".zip"));
+                }
+            }
+        }
+
         void loadIndexIntoMemory()
         {
             if (!File.Exists(_config.IndexFileLocation)) return;
-
+            long lineCount = 0;
             foreach (var line in File.ReadLines(_config.IndexFileLocation))
             {
-                if (line.IndexOf(Config.INDEX_ENTRY_SEPERATOR) > -1)
+                ++lineCount;
+                try
                 {
-                    var arr = line.Split(Config.INDEX_ENTRY_SEPERATOR);
-                    _fileDictionary.Add(arr[0], new Entry
+                    if (line.IndexOf(Config.INDEX_ENTRY_SEPERATOR) > -1)
                     {
-                        FilePath = arr[0],
-                        Checksum = arr[1],
-                        TimestampUtc = DateTime.ParseExact(arr[2], "yyyyMMddHHmmss", System.Globalization.CultureInfo.InvariantCulture),
-                        ComparisonResult = ComparisonResult.None
-                    });
+                        var arr = line.Split(Config.INDEX_ENTRY_SEPERATOR);
+                        _fileDictionary.Add(arr[0], new Entry
+                        {
+                            FilePath = arr[0],
+                            Checksum = arr[1],
+                            TimestampUtc = DateTime.ParseExact(arr[2], "yyyyMMddHHmmss", System.Globalization.CultureInfo.InvariantCulture),
+                            ComparisonResult = ComparisonResult.None
+                        });
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.Warn(ex, $"Could not parse and add the entity to index. Line number: {lineCount} Line: " + line);
                 }
             }
 
@@ -129,34 +178,50 @@ namespace HashComparer
                 foreach (var pattern in searchPatterns)
                 {
                     var files = Directory.GetFiles(directory, pattern);
-                    foreach (var f in files)
+                    foreach (var file in files)
                     {
-                        if (_config.IndexFileLocation.Equals(f, StringComparison.CurrentCultureIgnoreCase))
+                        if (_config.IndexFileLocation.Equals(file, StringComparison.CurrentCultureIgnoreCase))
                         {
                             continue;
                         }
 
-                        if (isInIndex(f, out Entry entry))
+                        string fileChecksum = String.Empty;
+                        var now = DateTime.UtcNow;
+                        Entry entry = default(Entry);
+                        if (isInIndex(file, out entry))
                         {
-                            entry.ComparisonResult = compareChecksum(f);
-                            _logger.Trace($"Checked {f} -> " + entry.ComparisonResult.ToString());
+
+                            entry.ComparisonResult = compareChecksum(file, out fileChecksum);
+                            _logger.Trace($"Checked {file} -> " + entry.ComparisonResult.ToString());
+                            string entryModification = String.Empty;
+                            if (entry.ComparisonResult == ComparisonResult.Modified || entry.ComparisonResult == ComparisonResult.Error)
+                            {
+                                entryModification = String.Format("{1}{0}{2}{0}{3}{0}{4}{0}{5}", Config.INDEX_ENTRY_SEPERATOR, file, entry.ComparisonResult, entry.Checksum, fileChecksum, DateTime.Now.ToString("yyyyMMddHHmmss"));
+                            }
+                            else if (entry.ComparisonResult == ComparisonResult.Deleted)
+                            {
+                                entryModification = String.Format("{1}{0}{2}{0}{3}{0}{4}{0}{5}", Config.INDEX_ENTRY_SEPERATOR, file, entry.ComparisonResult, entry.Checksum, "", DateTime.Now.ToString("yyyyMMddHHmmss"));
+                            }
+                            _logger.Trace(entryModification);
                         }
                         else
                         {
-                            _logger.Trace($"Added {f} to index");
+                            _logger.Trace($"New file found: {file}");
 
-                            var cs = checksum(f);
-                            var now = DateTime.UtcNow;
-
-                            _fileDictionary.Add(f, new Entry
+                            fileChecksum = checksum(file);
+                            entry = new Entry
                             {
-                                Checksum = cs,
+                                Checksum = fileChecksum,
                                 ComparisonResult = ComparisonResult.Added,
-                                FilePath = f,
+                                FilePath = file,
                                 TimestampUtc = now
-                            });
+                            };
+                            _fileDictionary.Add(file, entry);
+                        }
 
-                            string line = f + Config.INDEX_ENTRY_SEPERATOR + cs + Config.INDEX_ENTRY_SEPERATOR + now.ToString("yyyyMMddHHmmss");
+                        if (entry != null)
+                        {
+                            string line = file + Config.INDEX_ENTRY_SEPERATOR + entry.Checksum + Config.INDEX_ENTRY_SEPERATOR + entry.TimestampUtc.ToString("yyyyMMddHHmmss");
                             fs.WriteLine(line);
                         }
                     }
@@ -175,21 +240,21 @@ namespace HashComparer
 
         private bool isInIndex(string f, out Entry entry)
         {
-            entry = new Entry();
+            entry = default(Entry);
             bool exists = _fileDictionary.ContainsKey(f);
             if (exists) entry = _fileDictionary[f];
             return exists;
         }
 
-        ComparisonResult compareChecksum(string path)
+        ComparisonResult compareChecksum(string path, out string fileChecksum)
         {
             ComparisonResult status = ComparisonResult.Unmodified;
-
+            fileChecksum = String.Empty;
             try
             {
-                var cs = checksum(path);
+                fileChecksum = checksum(path);
 
-                if (cs.Equals(_fileDictionary[path].Checksum, StringComparison.InvariantCultureIgnoreCase))
+                if (fileChecksum.Equals(_fileDictionary[path].Checksum, StringComparison.InvariantCultureIgnoreCase))
                 {
                     status = ComparisonResult.Unmodified;
                 }

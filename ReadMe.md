@@ -22,6 +22,8 @@ The configuration keys and their values are described below:
 
 **TargetDirectories:** The program scans these directories. The directories are seperated by pipe (|) character. If no target directory is specified, the directory where application resides is scanned.
 
+**BackupFolder:** In each execution of HashComparer, the index file gets backed-up to the backup folder. If no backup folder is specified, a folder named "hashcomparer_backup" is created where application resides.
+
 **IndexFileLocation:** The path of the text file that includes the paths of files, their checksums, and time of entry.  If nothing is specified, the default value is "_hc_index.dat".
 
 **SearchLevel:** The default value is 1. To scan the subdirectories under the target directories, the level should be greater than 1.

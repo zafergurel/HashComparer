@@ -38,7 +38,7 @@ It's a .Net application. The development IDE is Visual Studio Community 2017. Th
 
 ## Installation
 
-Download the zip file under dist folder where you can find the latest version. 
+Download the latest version from the [releases page](https://github.com/zafergurel/HashComparer/releases). 
 
 Extract the files, change the configuration (by editing HashComparer.exe.config and NLog.config), and run HashComparer.
 

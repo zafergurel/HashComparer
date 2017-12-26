@@ -1,4 +1,4 @@
-﻿# HashComparer 1.1
+﻿# HashComparer
 
 HashComparer is a small application that checks the integrity of files by comparing their pre-calculated checksums in a file.
 

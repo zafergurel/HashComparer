@@ -26,9 +26,11 @@ namespace HashComparer
         public class Entry
         {
             public DateTime TimestampUtc { get; set; }
+            public DateTime? ModifiedTimestampUtc { get; set; }
             public string FilePath { get; set; }
             public string Checksum { get; set; }
-            public ComparisonResult ComparisonResult { get; set; }
+            public string OldChecksum { get; set; }
+            public ComparisonResult LastComparisonResult { get; set; }
         }
 
         private Dictionary<string, Entry> _fileDictionary;
@@ -90,10 +92,10 @@ namespace HashComparer
                     compareOrCreateChecksums(targetDirectory, 1);
                 }
 
-                NewFiles.AddRange(_fileDictionary.Where(f => f.Value.ComparisonResult == ComparisonResult.Added).Select(f => f.Key));
-                ModifiedFiles.AddRange(_fileDictionary.Where(f => f.Value.ComparisonResult == ComparisonResult.Modified).Select(f => f.Key));
-                UncheckedFiles.AddRange(_fileDictionary.Where(f => f.Value.ComparisonResult == ComparisonResult.Error).Select(f => f.Key));
-                DeletedFiles.AddRange(_fileDictionary.Where(f => f.Value.ComparisonResult == ComparisonResult.None && !File.Exists(f.Key)).Select(f => f.Key));
+                NewFiles.AddRange(_fileDictionary.Where(f => f.Value.LastComparisonResult == ComparisonResult.Added).Select(f => f.Key));
+                ModifiedFiles.AddRange(_fileDictionary.Where(f => f.Value.LastComparisonResult == ComparisonResult.Modified).Select(f => f.Key));
+                UncheckedFiles.AddRange(_fileDictionary.Where(f => f.Value.LastComparisonResult == ComparisonResult.Error).Select(f => f.Key));
+                DeletedFiles.AddRange(_fileDictionary.Where(f => f.Value.LastComparisonResult == ComparisonResult.None && !File.Exists(f.Key)).Select(f => f.Key));
 
                 return true;
             }
@@ -157,9 +159,11 @@ namespace HashComparer
                         _fileDictionary.Add(arr[0], new Entry
                         {
                             FilePath = arr[0],
-                            Checksum = arr[1],
-                            TimestampUtc = DateTime.ParseExact(arr[2], "yyyyMMddHHmmss", System.Globalization.CultureInfo.InvariantCulture),
-                            ComparisonResult = ComparisonResult.None
+                            LastComparisonResult = (ComparisonResult)Enum.Parse(typeof(ComparisonResult), arr[1]),
+                            Checksum = arr[2],
+                            OldChecksum = arr[3],
+                            TimestampUtc = parseTime(arr[4]),
+                            ModifiedTimestampUtc = !String.IsNullOrEmpty(arr[5]) ? parseTime(arr[5]) : (DateTime?)null
                         });
                     }
                 }
@@ -191,16 +195,21 @@ namespace HashComparer
                         if (isInIndex(file, out entry))
                         {
 
-                            entry.ComparisonResult = compareChecksum(file, out fileChecksum);
-                            _logger.Trace($"Checked {file} -> " + entry.ComparisonResult.ToString());
+                            entry.LastComparisonResult = compareChecksum(file, out fileChecksum);
+                            _logger.Trace($"Checked {file} -> " + entry.LastComparisonResult.ToString());
                             string entryModification = String.Empty;
-                            if (entry.ComparisonResult == ComparisonResult.Modified || entry.ComparisonResult == ComparisonResult.Error)
+                            if (entry.LastComparisonResult == ComparisonResult.Modified || entry.LastComparisonResult == ComparisonResult.Error)
                             {
-                                entryModification = String.Format("{1}{0}{2}{0}{3}{0}{4}{0}{5}", Config.INDEX_ENTRY_SEPERATOR, file, entry.ComparisonResult, entry.Checksum, fileChecksum, DateTime.Now.ToString("yyyyMMddHHmmss"));
+                                entry.OldChecksum = entry.Checksum;
+                                entry.Checksum = fileChecksum;
+                                entry.ModifiedTimestampUtc = DateTime.UtcNow;
+                                entryModification = String.Format("{1}{0}{2}{0}{3}{0}{4}{0}{5}", Config.INDEX_ENTRY_SEPERATOR, file, entry.LastComparisonResult, entry.Checksum, entry.OldChecksum, DateTime.Now.ToString("yyyyMMddHHmmss"));
                             }
-                            else if (entry.ComparisonResult == ComparisonResult.Deleted)
+                            else if (entry.LastComparisonResult == ComparisonResult.Deleted)
                             {
-                                entryModification = String.Format("{1}{0}{2}{0}{3}{0}{4}{0}{5}", Config.INDEX_ENTRY_SEPERATOR, file, entry.ComparisonResult, entry.Checksum, "", DateTime.Now.ToString("yyyyMMddHHmmss"));
+                                entryModification = String.Format("{1}{0}{2}{0}{3}{0}{4}{0}{5}", Config.INDEX_ENTRY_SEPERATOR, file, entry.LastComparisonResult, entry.Checksum, entry.OldChecksum, DateTime.Now.ToString("yyyyMMddHHmmss"));
+                                // we don't want the entry to be added to the index again...
+                                entry = null;
                             }
                             _logger.Trace(entryModification);
                         }
@@ -212,16 +221,18 @@ namespace HashComparer
                             entry = new Entry
                             {
                                 Checksum = fileChecksum,
-                                ComparisonResult = ComparisonResult.Added,
+                                OldChecksum = String.Empty,
+                                LastComparisonResult = ComparisonResult.Added,
                                 FilePath = file,
-                                TimestampUtc = now
+                                TimestampUtc = now,
+                                ModifiedTimestampUtc = null
                             };
                             _fileDictionary.Add(file, entry);
                         }
 
                         if (entry != null)
                         {
-                            string line = file + Config.INDEX_ENTRY_SEPERATOR + entry.Checksum + Config.INDEX_ENTRY_SEPERATOR + entry.TimestampUtc.ToString("yyyyMMddHHmmss");
+                            string line = String.Format("{1}{0}{2}{0}{3}{0}{4}{0}{5:yyyyMMddHHmmss}{0}{6:yyyyMMddHHmmss}", Config.INDEX_ENTRY_SEPERATOR, file, entry.LastComparisonResult, entry.Checksum, entry.OldChecksum, entry.TimestampUtc, entry.ModifiedTimestampUtc);
                             fs.WriteLine(line);
                         }
                     }
@@ -295,6 +306,14 @@ namespace HashComparer
             {
                 return String.Empty;
             }
+        }
+
+        DateTime parseTime(string s)
+        {
+            if (String.IsNullOrEmpty(s))
+                return DateTime.MinValue;
+
+            return DateTime.ParseExact(s, "yyyyMMddHHmmss", System.Globalization.CultureInfo.InvariantCulture);
         }
     }
 }
